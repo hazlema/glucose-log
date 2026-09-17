@@ -34,8 +34,9 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
  fun keyboardVisibilityChanged(visible:Boolean,eligible:Boolean) {
   if(keyboardClose.update(visible,eligible,changed(),submitting)) submit()
  }
+ private var editSaveButton:Button?=null
  private var submitting=false
- fun setSaving(value:Boolean) { submitting=value; number.isEnabled=!value; notes.isEnabled=!value; meal.isEnabled=!value; unitButton.isEnabled=!value; timeButton.isEnabled=!value }
+ fun setSaving(value:Boolean) { submitting=value; editSaveButton?.isEnabled=!value; number.isEnabled=!value; notes.isEnabled=!value; meal.isEnabled=!value; unitButton.isEnabled=!value; timeButton.isEnabled=!value }
  private var exactValue=saved?.getDouble("exact") ?: original?.value ?: unit.initial.toDouble()
  private var rendered=saved?.getString("rendered") ?: unit.format(exactValue)
  init {
@@ -80,6 +81,10 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   notes.imeOptions=EditorInfo.IME_ACTION_DONE
   notes.setOnEditorActionListener { _,action,_ -> if(action==EditorInfo.IME_ACTION_DONE) { submit(); true } else false }
   details.addView(Ui.text(c,"Notes stay on your phone. Done or closing the keyboard saves your changes.",13f).apply { setTextColor(Ui.muted) })
+  if(original!=null) {
+   editSaveButton=Ui.button(c,"Save changes",true) { submit() }
+   addView(editSaveButton)
+  }
  }
  private fun value():Double {
   val parsed=unit.parse(number.text.toString())

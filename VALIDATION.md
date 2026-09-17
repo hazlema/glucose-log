@@ -1,3 +1,7 @@
+# Verification — Glucose Log 0.3.1
+
+Edit-only Save changes button added above Cancel edit. Installed on Pixel. 16 JVM tests pass; lint zero errors. Isolated phone test confirms notes-only edits preserve ID, measurement time and expected revision, and repeated Save taps submit once. All previous device regressions pass. No synthetic Health Connect records written. Test helper removed.
+
 # Verification — Glucose Log 0.3.0
 
 - Installed in place on the Pixel; app readings and permissions retained.

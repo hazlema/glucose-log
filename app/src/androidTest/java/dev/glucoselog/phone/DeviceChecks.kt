@@ -54,6 +54,15 @@ class DeviceChecks:Instrumentation() {
      if(v is ViewGroup) for(i in 0 until v.childCount) { val found=number(v.getChildAt(i)); if(found!=null) return found }
      return null
     }
+    val edits=mutableListOf<Entry>()
+    val original=Entry("edit-test",100.0,GlucoseUnit.MG,1700000000,0,0,"old note",1,false,true)
+    val editForm=EntryForm(activity!!,original,null,GlucoseUnit.MG) { edits.add(it) }
+    fun descendants(v:View):List<View> = listOf(v)+(if(v is ViewGroup) (0 until v.childCount).flatMap { descendants(v.getChildAt(it)) } else emptyList())
+    val saveButton=descendants(editForm).filterIsInstance<android.widget.Button>().single { it.text.toString()=="Save changes" }
+    descendants(editForm).filterIsInstance<android.widget.EditText>().last().setText("new note")
+    saveButton.performClick(); saveButton.performClick()
+    check(edits.size==1 && edits.single().note=="new note" && edits.single().id==original.id && edits.single().time==original.time && edits.single().revision==1L) { "Save changes didn't preserve reading identity or save notes exactly once" }
+    check(descendants(form).filterIsInstance<android.widget.Button>().none { it.text.toString()=="Save changes" }) { "New reading unexpectedly has edit Save button" }
     val field=number(form)!!
     val dismissals=mutableListOf<Entry>()
     val dismissForm=EntryForm(activity!!,null,null,GlucoseUnit.MG) { dismissals.add(it) }
@@ -92,7 +101,7 @@ class DeviceChecks:Instrumentation() {
     field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
     check(saved.size==2) { "Invalid value was submitted" }
    }
-   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen, partial typing, Done, hardware Enter, duplicate guard, invalid input, changed/unchanged/invalid keyboard dismissal, Done plus dismissal, restored draft") })
+   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen, partial typing, Done, hardware Enter, duplicate guard, invalid input, changed/unchanged/invalid keyboard dismissal, Done plus dismissal, restored draft, edit Save changes") })
   } catch(t:Throwable) { finish(Activity.RESULT_CANCELED,Bundle().apply { putString("failure",t.stackTraceToString()) }) }
   finally { activity?.let { a -> onUi { a.finish() } }; store.close(); targetContext.deleteDatabase(name) }
  }
