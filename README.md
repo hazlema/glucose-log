@@ -1,45 +1,46 @@
 # Glucose Log
 
-A small, personal Android glucose journal. Enter on your phone, save locally, and export to Health Connect for apps such as Cronometer. No account, Garmin connection, advertising, analytics, or server.
+A simple Android blood-glucose journal that syncs with Health Connect. Built for quick manual logging, with no account, ads, analytics, or server.
 
-## Use
+## Features
 
-Open **Glucose Log** (distinct from **Glucose Log Bridge**). The entry starts at 100 mg/dL. Tap the unit button to convert the draft to mmol/L. Choose a measurement date/time or leave it at Now, optionally add a meal label and notes, then press the keyboard’s **Done** button, hardware **Enter**, or dismiss the keyboard after changing the reading. This saves and syncs immediately. Opening and closing the keyboard without changes does not create a record; invalid values remain in the form with an error. A persistent **Last saved** message confirms the local save, while the toast confirms Health Connect acceptance. There is no separate Save button. Optional time, meal, and notes are under **+ Time, meal & notes**; set these before finishing entry.
+- Log in mg/dL or mmol/L; new entries start at 100 mg/dL.
+- Save with the keyboard's Done/Enter key, or dismiss the keyboard after making changes.
+- Optional measurement time, meal label, and local-only notes.
+- History, a seven-day graph, and editing/deletion.
+- Automatic Health Connect sync, durable retries, and a toast confirming successful export.
 
-On first use, tap **Connect Health Connect** and allow blood glucose write access. The connection button disappears once connected; a small status line remains. A toast names the reading only after Health Connect accepts its saved revision. New readings and edits sync after saving and on opening the app; pending changes also retry periodically when Android permits. Local logging works without permission. If sync is unavailable, the status says changes are waiting; Settings offers Retry pending sync. History marks each reading sent or waiting. A successful export does not guarantee immediate Cronometer import. In Cronometer, enable its Health Connect blood-glucose import and backfill if needed.
+## Getting started
 
-The bottom buttons navigate directly: **New reading** always opens a fresh entry and **History** opens the history page. Navigating away clears the unsaved form/edit state.
+1. Install the APK and open **Glucose Log**.
+2. Tap **Connect Health Connect** and allow blood glucose write access.
+3. Enter a reading, optionally expand **Time, meal & notes**, then finish entry to save.
 
-History contains a seven-day scatter graph and all local entries. Settings controls the history display unit and default unit for new forms; the current draft retains its own unit. Edit preserves the reading identity and provides a visible **Save changes** button above **Cancel edit**, including for notes-only or meal-label changes. Delete asks for confirmation and queues removal of this app's Health Connect record. Cronometer may retain an already imported copy.
+**New reading** always opens a fresh form. **History** shows saved entries; editing has a **Save changes** button. Untouched defaults are not saved when the keyboard closes, and invalid entries remain in the form for correction.
 
-Notes remain local. Health Connect receives glucose, timestamp/offset, manual-entry metadata and supported meal relation. Android internally represents glucose in mmol/L even when entered in mg/dL. 100 mg/dL = 5.5556 mmol/L; this does not alter the measurement. No A1c estimate or treatment recommendation.
+For Cronometer, enable its Health Connect blood-glucose import. Cronometer controls import timing and may require a backfill. Health Connect can display mmol/L even when you enter mg/dL; the values are converted correctly.
 
-## Privacy and data ownership
+## Build and install
 
-The private SQLite database stores the journal and pending sync changes. The app requests only WRITE_BLOOD_GLUCOSE and RECEIVE_BOOT_COMPLETED (to preserve periodic retries). It has no Internet permission and does not read other apps' records. App backup and device transfer are excluded. Uninstalling or clearing storage loses local readings/notes and pending changes; exported Health Connect records may remain. Keep the app installed while changes are waiting. The older Garmin bridge and its Health Connect records are untouched.
-
-## Build
-
-Requirements: JDK 17, Android SDK platform 36, build tools, and Gradle 8.13 (wrapper included). Set JAVA_HOME and ANDROID_HOME for your installation, then:
+Requires JDK 17 and Android SDK platform 36. Set `JAVA_HOME` and `ANDROID_HOME` (or set `sdk.dir` in `local.properties`). The included wrapper uses Gradle 8.13.
 
 ```sh
 ./gradlew testDebugUnitTest assembleDebug lintDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`. A delivery copy is `dist/GlucoseLog.apk`. Package `dev.glucoselog.phone`, Android 9+ (Health Connect availability depends on Android/provider). Target SDK 35. Signed with the local Android debug key for personal installation, not a Play Store release.
+Android 9+; Health Connect availability depends on Android version and provider support. Package: `dev.glucoselog.phone`. Tested on a Pixel 7. APKs and signing keys are not committed; preserve your signing key to install future updates over the same app.
 
-Install using `adb install --no-streaming -r dist/GlucoseLog.apk` on a paired device, or copy the APK to the phone and open it with Android's package installer. Preserve the signing key for future updates.
+## Your data
 
-## Verification
+Readings and notes live in a private database on your phone. Only glucose, measurement time, and supported meal labels are exported to Health Connect. Notes stay local. The app has no Internet permission and does not read other apps' health records.
 
-`testDebugUnitTest` covers value validation, mg/dL and mmol/L, time bounds, retry identity, stale acknowledgements, deletion routing, and actual Health Connect record metadata/conversions.
+Sync runs after saving, when the app opens, and periodically when Android permits. Failed changes stay queued. Deletions also sync, though other apps may retain imported copies.
 
-The custom `DeviceChecks` instrumentation uses an isolated temporary database and never writes synthetic data to Health Connect. It checks save/reopen durability, revision handling, deletion, stale edit rejection, and main-screen startup. Build `assembleDebugAndroidTest`, install the test APK, then:
+Local backup is disabled. Uninstalling or clearing app storage removes local history, notes, and pending changes; previously exported Health Connect records may remain.
 
-```sh
-adb shell am instrument -w dev.glucoselog.phone.test/dev.glucoselog.phone.DeviceChecks
-```
+This is a personal logging app, not a glucose sensor or treatment advisor. It does not estimate A1c.
 
-Expect `result=PASS: ...` and `INSTRUMENTATION_CODE: -1`; Android's command exit status alone does not establish success. Run with the phone unlocked. This is a development test that opens and closes the app; run before entering a draft. Remove the test-only package afterwards with `adb uninstall dev.glucoselog.phone.test`.
+## Testing
 
-Physical acceptance: allow Health Connect access, enter a real reading, verify its value/time in Health Connect and Cronometer. Test editing and deleting a disposable test reading only if intentionally desired. Background retries are opportunistic, not an exact 15-minute promise. This app cannot control Cronometer's unit rendering or import timing.
+The JVM suite covers validation, unit conversion, timestamps, retry behavior, edit versions, keyboard dismissal, and sync confirmations. On-device checks use a separate temporary database and do not write synthetic readings to Health Connect. See [VALIDATION.md](VALIDATION.md) for verification details.
