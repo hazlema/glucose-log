@@ -39,7 +39,7 @@ class DeviceChecks:Instrumentation() {
    onUi {
     fun texts(v:View):List<String> = (if(v is TextView) listOf(v.text.toString()) else emptyList()) + (if(v is ViewGroup) (0 until v.childCount).flatMap { texts(v.getChildAt(it)) } else emptyList())
     val labels=texts(activity!!.window.decorView)
-    check(labels.contains("Glucose Log") && labels.contains("Press Done or Enter to save and sync")) { "Default entry form did not render" }
+    check(labels.contains("Glucose Log") && labels.contains("Done or closing the keyboard saves your changes")) { "Default entry form did not render" }
    }
    onUi {
     val decor=activity!!.window.decorView
@@ -55,6 +55,27 @@ class DeviceChecks:Instrumentation() {
      return null
     }
     val field=number(form)!!
+    val dismissals=mutableListOf<Entry>()
+    val dismissForm=EntryForm(activity!!,null,null,GlucoseUnit.MG) { dismissals.add(it) }
+    val dismissField=number(dismissForm)!!
+    dismissForm.keyboardVisibilityChanged(true,true); dismissForm.keyboardVisibilityChanged(false,true)
+    check(dismissals.isEmpty()) { "Untouched default saved on dismissal" }
+    dismissField.setText("0"); dismissForm.keyboardVisibilityChanged(true,true); dismissForm.keyboardVisibilityChanged(false,true)
+    check(dismissals.isEmpty() && dismissField.error!=null) { "Invalid dismissal wasn't kept as a draft" }
+    dismissField.setText("135"); dismissForm.keyboardVisibilityChanged(true,true); dismissForm.keyboardVisibilityChanged(false,true)
+    check(dismissals.size==1 && dismissals.single().value==135.0) { "Changed reading didn't save on dismissal" }
+    dismissForm.keyboardVisibilityChanged(false,true)
+    check(dismissals.size==1) { "Repeated hidden event duplicated save" }
+    val afterDone=EntryForm(activity!!,null,null,GlucoseUnit.MG) { dismissals.add(it) }
+    number(afterDone)!!.setText("140"); afterDone.keyboardVisibilityChanged(true,true)
+    number(afterDone)!!.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+    afterDone.keyboardVisibilityChanged(false,true)
+    check(dismissals.size==2) { "Done followed by keyboard dismissal duplicated save" }
+    val draftForm=EntryForm(activity!!,null,null,GlucoseUnit.MG) {}
+    number(draftForm)!!.setText("145")
+    val restoredForm=EntryForm(activity!!,null,draftForm.snapshot(),GlucoseUnit.MG) { dismissals.add(it) }
+    restoredForm.keyboardVisibilityChanged(true,true); restoredForm.keyboardVisibilityChanged(false,true)
+    check(dismissals.size==3 && dismissals.last().value==145.0) { "Restored draft lost its changed state" }
     field.setText("1"); field.setText("11"); field.setText("110")
     check(saved.isEmpty()) { "Typing partial digits saved a reading" }
     field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
@@ -71,7 +92,7 @@ class DeviceChecks:Instrumentation() {
     field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
     check(saved.size==2) { "Invalid value was submitted" }
    }
-   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen, partial typing, Done, hardware Enter, duplicate guard, invalid input") })
+   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen, partial typing, Done, hardware Enter, duplicate guard, invalid input, changed/unchanged/invalid keyboard dismissal, Done plus dismissal, restored draft") })
   } catch(t:Throwable) { finish(Activity.RESULT_CANCELED,Bundle().apply { putString("failure",t.stackTraceToString()) }) }
   finally { activity?.let { a -> onUi { a.finish() } }; store.close(); targetContext.deleteDatabase(name) }
  }

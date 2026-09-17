@@ -1,3 +1,13 @@
+# Verification — Glucose Log 0.3.0
+
+- Installed in place on the Pixel; app readings and permissions retained.
+- 16 JVM tests pass; Android lint has zero errors.
+- On-device isolated tests pass for storage/version/deletion, Done, hardware Enter, invalid input and duplicate guards. Added form-level visible/hidden event tests for changed, untouched, invalid and restored drafts, and Done followed by keyboard dismissal. These drive the form's keyboard visibility callback; they do not inject fake readings into Health Connect or automate a real IME animation.
+- MainActivity observes AndroidX WindowInsetsCompat IME visibility using Android's documented API. Startup, background, window-focus loss and already-submitting states do not auto-save. Existing glucose baseline survives draft restoration.
+- Code review found no important issues in the bounded change.
+- Last saved value/time remains visible independently of Health Connect status and survives Activity recreation. The accepted-revision Health Connect toast is unchanged.
+- Test-only package removed after checks. No synthetic Health Connect data written.
+
 # Verification — Glucose Log 0.2.0
 
 - Built and installed in place on the paired Pixel. Existing app database and Health Connect permission preserved; no uninstall of the actual app.

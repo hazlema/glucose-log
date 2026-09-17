@@ -20,6 +20,8 @@ class MainActivity:ComponentActivity() {
  private lateinit var store:EntryStore
  private lateinit var body:LinearLayout
  private lateinit var status:TextView
+ private lateinit var savedNotice:TextView
+ private var lastSaved=""
  private lateinit var syncButton:Button
  private var form:EntryForm?=null
  private var draft:Bundle?=null
@@ -40,6 +42,7 @@ class MainActivity:ComponentActivity() {
  override fun onCreate(savedInstanceState:Bundle?) {
   super.onCreate(savedInstanceState)
   store=EntryStore.get(this)
+  lastSaved=savedInstanceState?.getString("lastSaved") ?: ""
   repeat(savedInstanceState?.getInt("noticeCount") ?: 0) { i ->
    savedInstanceState?.getBundle("notice$i")?.let { n ->
     val id=n.getString("id") ?: return@let
@@ -51,14 +54,11 @@ class MainActivity:ComponentActivity() {
   val editId=savedInstanceState?.getString("editing")
   if(editId!=null) { editing=store.all().find { it.id==editId }; if(editing==null) draft=null }
   val root=Ui.column(this).apply { setBackgroundColor(Color.WHITE); setPadding(Ui.dp(this@MainActivity,20),0,Ui.dp(this@MainActivity,20),0) }
-  if(android.os.Build.VERSION.SDK_INT>=30) root.setOnApplyWindowInsetsListener { v,insets ->
-   val system=insets.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.ime())
-   v.setPadding(Ui.dp(this,20)+system.left,system.top,Ui.dp(this,20)+system.right,system.bottom); insets
-  }
-  // API 28/29 use the legacy inset fields.
-  if(android.os.Build.VERSION.SDK_INT<30) root.setOnApplyWindowInsetsListener { v,insets ->
-   @Suppress("DEPRECATION")
-   v.setPadding(Ui.dp(this,20)+insets.systemWindowInsetLeft,insets.systemWindowInsetTop,Ui.dp(this,20)+insets.systemWindowInsetRight,insets.systemWindowInsetBottom); insets
+  androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v,insets ->
+   val system=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.ime())
+   v.setPadding(Ui.dp(this,20)+system.left,system.top,Ui.dp(this,20)+system.right,system.bottom)
+   form?.keyboardVisibilityChanged(insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()),lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) && window.decorView.hasWindowFocus())
+   insets
   }
   val heading=LinearLayout(this).apply { gravity=android.view.Gravity.CENTER_VERTICAL; setPadding(0,Ui.dp(this@MainActivity,8),0,Ui.dp(this@MainActivity,8)) }
   heading.addView(Ui.text(this,"Glucose Log",28f,true),LinearLayout.LayoutParams(0,-2,1f))
@@ -73,6 +73,7 @@ class MainActivity:ComponentActivity() {
   nav("New reading","log"); nav("History","history")
   status=Ui.text(this,"Checking Health Connect…",14f).apply { setTextColor(Ui.muted) }; root.addView(status)
   syncButton=Ui.button(this,"Connect Health Connect") { connectOrSync() }.apply { visibility=View.GONE }; root.addView(syncButton)
+  savedNotice=Ui.text(this,lastSaved,15f,true).apply { setTextColor(Ui.teal); visibility=if(lastSaved.isEmpty()) View.GONE else View.VISIBLE }; root.addView(savedNotice)
   body=Ui.column(this)
   root.addView(ScrollView(this).apply { isFillViewport=true; addView(body) },LinearLayout.LayoutParams(-1,0,1f))
   root.addView(navigation)
@@ -80,7 +81,13 @@ class MainActivity:ComponentActivity() {
   if(!SyncJob.schedule(this)) status.text="Automatic retry is unavailable. Use Sync to Health Connect."
  }
  override fun onResume() { super.onResume(); if(::status.isInitialized) sync() }
+ override fun onPause() { form?.keyboardVisibilityChanged(false,false); super.onPause() }
+ override fun onWindowFocusChanged(hasFocus:Boolean) {
+  super.onWindowFocusChanged(hasFocus)
+  if(!hasFocus) form?.keyboardVisibilityChanged(false,false) else window.decorView.requestApplyInsets()
+ }
  override fun onSaveInstanceState(out:Bundle) {
+  out.putString("lastSaved",lastSaved)
   val pending=notices.pending(); out.putInt("noticeCount",pending.size)
   pending.forEachIndexed { i,e -> out.putBundle("notice$i",Bundle().apply { putString("id",e.id); putDouble("value",e.value); putString("unit",e.unit.name); putLong("revision",e.revision) }) }
   out.putString("tab",tab); out.putBundle("draft",if(tab=="log") form?.snapshot() else draft); out.putString("editing",editing?.id); super.onSaveInstanceState(out)
@@ -100,6 +107,8 @@ class MainActivity:ComponentActivity() {
    try {
     val saved=withContext(Dispatchers.IO) { store.save(e) }
     notices.add(saved)
+    lastSaved="Last saved: ${saved.unit.format(saved.value)} ${saved.unit.label} · ${java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a"))}"
+    savedNotice.text=lastSaved; savedNotice.visibility=View.VISIBLE
     preferredUnit=e.unit; editing=null; draft=null
     status.text="Saved on this phone. Sending to Health Connect…"
     (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(form?.windowToken,0)

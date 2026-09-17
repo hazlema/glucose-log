@@ -25,6 +25,15 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
  private val meal=Spinner(c)
  private val timeButton:Button
  private val unitButton:Button
+ private val keyboardClose=KeyboardClose()
+ private val baselineMg=saved?.getDouble("baselineMg") ?: original?.let { it.unit.toMg(it.value) } ?: initialUnit.toMg(initialUnit.initial.toDouble())
+ private fun changed():Boolean {
+  val changedValue=try { kotlin.math.abs(unit.toMg(value())-baselineMg)>0.000001 } catch(_:IllegalArgumentException) { true }
+  return changedValue || notes.text.toString().trim()!=(original?.note ?: "") || meal.selectedItemPosition!=(original?.context ?: 0) || (customTime && instant!=original?.time)
+ }
+ fun keyboardVisibilityChanged(visible:Boolean,eligible:Boolean) {
+  if(keyboardClose.update(visible,eligible,changed(),submitting)) submit()
+ }
  private var submitting=false
  fun setSaving(value:Boolean) { submitting=value; number.isEnabled=!value; notes.isEnabled=!value; meal.isEnabled=!value; unitButton.isEnabled=!value; timeButton.isEnabled=!value }
  private var exactValue=saved?.getDouble("exact") ?: original?.value ?: unit.initial.toDouble()
@@ -53,7 +62,7 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   unitButton=Ui.button(c,unit.label) { switchUnit() }
   numberRow.addView(unitButton,LinearLayout.LayoutParams(-2,Ui.dp(c,56)))
   addView(numberRow)
-  addView(Ui.text(c,"Press Done or Enter to save and sync",14f).apply { setTextColor(Ui.muted) })
+  addView(Ui.text(c,"Done or closing the keyboard saves your changes",14f).apply { setTextColor(Ui.muted) })
   val details=Ui.column(c).apply { visibility=if(saved?.getBoolean("details")==true || original!=null) VISIBLE else GONE }
   val detailsToggle=Ui.button(c,if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes") {}
   detailsToggle.setOnClickListener { details.visibility=if(details.visibility==VISIBLE) GONE else VISIBLE; detailsToggle.text=if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes" }
@@ -70,7 +79,7 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   details.addView(notes)
   notes.imeOptions=EditorInfo.IME_ACTION_DONE
   notes.setOnEditorActionListener { _,action,_ -> if(action==EditorInfo.IME_ACTION_DONE) { submit(); true } else false }
-  details.addView(Ui.text(c,"Notes stay on your phone. Press Done on the reading field when ready.",13f).apply { setTextColor(Ui.muted) })
+  details.addView(Ui.text(c,"Notes stay on your phone. Done or closing the keyboard saves your changes.",13f).apply { setTextColor(Ui.muted) })
  }
  private fun value():Double {
   val parsed=unit.parse(number.text.toString())
@@ -99,9 +108,9 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
    val zone=if(customTime) offset else ZoneId.systemDefault().rules.getOffset(Instant.ofEpochSecond(time)).totalSeconds
    val e=Entry(id,value(),unit,time,zone,meal.selectedItemPosition,notes.text.toString().trim(),expectedRevision,false,false)
    e.validate(Instant.now().epochSecond); setSaving(true); onSave(e)
-  } catch(ex:IllegalArgumentException) { setSaving(false); Toast.makeText(context,ex.message,Toast.LENGTH_LONG).show() }
+  } catch(ex:IllegalArgumentException) { setSaving(false); number.error=ex.message; Toast.makeText(context,ex.message,Toast.LENGTH_LONG).show() }
  }
  fun snapshot()=Bundle().apply {
-  putBoolean("details",findViewWithTag<android.view.View>("details")?.visibility==VISIBLE); putString("id",id); putLong("revision",expectedRevision); putString("unit",unit.name); putString("number",number.text.toString()); putString("note",notes.text.toString()); putInt("meal",meal.selectedItemPosition); putBoolean("customTime",customTime); putLong("time",instant); putInt("offset",offset); putDouble("exact",exactValue); putString("rendered",rendered)
+  putDouble("baselineMg",baselineMg); putBoolean("details",findViewWithTag<android.view.View>("details")?.visibility==VISIBLE); putString("id",id); putLong("revision",expectedRevision); putString("unit",unit.name); putString("number",number.text.toString()); putString("note",notes.text.toString()); putInt("meal",meal.selectedItemPosition); putBoolean("customTime",customTime); putLong("time",instant); putInt("offset",offset); putDouble("exact",exactValue); putString("rendered",rendered)
  }
 }
