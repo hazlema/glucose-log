@@ -7,7 +7,7 @@ A simple Android blood-glucose journal that syncs with Health Connect. Built for
 - Log in mg/dL or mmol/L; new entries start at 100 mg/dL.
 - Save with the keyboard's Done/Enter key, or dismiss the keyboard after making changes.
 - Optional measurement time, meal label, and local-only notes.
-- History, a seven-day graph, and editing/deletion.
+- History, a seven-day scatter plot, and editing/deletion. The graph spans at least 60 mg/dL (or the mmol/L equivalent), so small changes stay visually modest.
 - Automatic Health Connect sync, durable retries, and a toast confirming successful export.
 
 ## Screenshots
@@ -58,4 +58,8 @@ This is a personal logging app, not a glucose sensor or treatment advisor. It do
 
 ## Testing
 
-The JVM suite covers validation, unit conversion, timestamps, retry behavior, edit versions, keyboard dismissal, and sync confirmations. On-device checks use a separate temporary database and do not write synthetic readings to Health Connect. See [VALIDATION.md](VALIDATION.md) for verification details.
+The JVM suite covers graph scaling, validation, unit conversion, timestamps, retry behavior, edit versions, keyboard dismissal, and sync confirmations. On-device checks use a separate temporary database and do not write synthetic readings to Health Connect. See [VALIDATION.md](VALIDATION.md) for verification details.
+
+## License
+
+[MIT](LICENSE). Use, copy, modify, and share it freely; retain the license and copyright notice.

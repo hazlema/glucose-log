@@ -39,7 +39,7 @@ class DeviceChecks:Instrumentation() {
    onUi {
     fun texts(v:View):List<String> = (if(v is TextView) listOf(v.text.toString()) else emptyList()) + (if(v is ViewGroup) (0 until v.childCount).flatMap { texts(v.getChildAt(it)) } else emptyList())
     val labels=texts(activity!!.window.decorView)
-    check(labels.contains("Glucose Log") && labels.contains("Done or closing the keyboard saves your changes")) { "Default entry form did not render" }
+    check(labels.contains("Glucose Log") && labels.contains("Close the keyboard to save")) { "Default entry form did not render" }
    }
    onUi {
     val decor=activity!!.window.decorView

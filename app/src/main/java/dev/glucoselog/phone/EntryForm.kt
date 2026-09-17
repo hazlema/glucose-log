@@ -63,7 +63,7 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   unitButton=Ui.button(c,unit.label) { switchUnit() }
   numberRow.addView(unitButton,LinearLayout.LayoutParams(-2,Ui.dp(c,56)))
   addView(numberRow)
-  addView(Ui.text(c,"Done or closing the keyboard saves your changes",14f).apply { setTextColor(Ui.muted) })
+  addView(Ui.text(c,"Close the keyboard to save",14f).apply { setTextColor(Ui.muted) })
   val details=Ui.column(c).apply { visibility=if(saved?.getBoolean("details")==true || original!=null) VISIBLE else GONE }
   val detailsToggle=Ui.button(c,if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes") {}
   detailsToggle.setOnClickListener { details.visibility=if(details.visibility==VISIBLE) GONE else VISIBLE; detailsToggle.text=if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes" }
@@ -80,7 +80,7 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   details.addView(notes)
   notes.imeOptions=EditorInfo.IME_ACTION_DONE
   notes.setOnEditorActionListener { _,action,_ -> if(action==EditorInfo.IME_ACTION_DONE) { submit(); true } else false }
-  details.addView(Ui.text(c,"Notes stay on your phone. Done or closing the keyboard saves your changes.",13f).apply { setTextColor(Ui.muted) })
+  details.addView(Ui.text(c,"Notes stay on your phone. Close the keyboard to save.",13f).apply { setTextColor(Ui.muted) })
   if(original!=null) {
    editSaveButton=Ui.button(c,"Save changes",true) { submit() }
    addView(editSaveButton)

@@ -6,7 +6,6 @@ import android.view.View
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.math.max
 
 class ChartView(c:Context,entries:List<Entry>,private val unit:GlucoseUnit):View(c) {
  private val end=Instant.now().epochSecond
@@ -20,8 +19,8 @@ class ChartView(c:Context,entries:List<Entry>,private val unit:GlucoseUnit):View
   paint.textSize=12*resources.displayMetrics.scaledDensity; paint.color=Ui.muted
   if(points.isEmpty()) { canvas.drawText("Your readings will appear here.",16*d,height/2f,paint); return }
   val values=points.map { unit.fromMg(it.unit.toMg(it.value)) }
-  val min=values.min(); val maxValue=values.max(); val padding=max((maxValue-min)*0.15,if(unit==GlucoseUnit.MG) 10.0 else 0.6)
-  val low=max(0.0,min-padding); val high=maxValue+padding
+  val axis=ChartScale.bounds(values,unit)
+  val low=axis.low; val high=axis.high
   for(i in 0..2) {
    val y=bottom-(bottom-top)*i/2f
    paint.color=0xffd5e1e9.toInt(); paint.strokeWidth=d; canvas.drawLine(left,y,right,y,paint)

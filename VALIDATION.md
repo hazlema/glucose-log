@@ -1,3 +1,10 @@
+# Verification — Glucose Log 0.3.3
+
+- Graph uses a minimum 60 mg/dL span (equivalent in mmol/L), expands for wider data, and keeps its lower bound nonnegative. Points remain unconnected; this is a display scale, not a clinical target range.
+- 20 JVM tests pass, including narrow/single-point, wide-range, lower-bound, and unit-equivalence scaling cases. Android lint has zero errors.
+- Installed in place on Pixel 7 running Android 17. Existing isolated on-device regression checks pass; no synthetic Health Connect readings written. Test helper removed.
+- Entry and history screenshots captured on the phone and visually inspected. Entry hint now reads “Close the keyboard to save.”
+
 # Verification — Glucose Log 0.3.2
 
 Bottom navigation now clears the transient edit/draft and opens the chosen page. New reading always opens a fresh entry. Installed in place on Pixel. 16 JVM tests pass; lint zero errors. Phone regression verifies New reading removes edit controls and restores the default entry value. Prior phone checks pass. No synthetic Health Connect records written; test helper removed.
