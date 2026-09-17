@@ -26,6 +26,9 @@ class MainActivity:ComponentActivity() {
  private var editing:Entry?=null
  private var tab="log"
  private var syncing=false
+ private var syncAgain=false
+ private val notices=SyncNotices()
+ private val navButtons=mutableMapOf<String,Button>()
  private var saving=false
  private val prefs by lazy { getSharedPreferences("settings",MODE_PRIVATE) }
  private var preferredUnit:GlucoseUnit
@@ -37,6 +40,13 @@ class MainActivity:ComponentActivity() {
  override fun onCreate(savedInstanceState:Bundle?) {
   super.onCreate(savedInstanceState)
   store=EntryStore.get(this)
+  repeat(savedInstanceState?.getInt("noticeCount") ?: 0) { i ->
+   savedInstanceState?.getBundle("notice$i")?.let { n ->
+    val id=n.getString("id") ?: return@let
+    val unit=GlucoseUnit.valueOf(n.getString("unit") ?: "MG")
+    notices.add(Entry(id,n.getDouble("value"),unit,1,0,0,"",n.getLong("revision"),false,false))
+   }
+  }
   tab=savedInstanceState?.getString("tab") ?: "log"; draft=savedInstanceState?.getBundle("draft")
   val editId=savedInstanceState?.getString("editing")
   if(editId!=null) { editing=store.all().find { it.id==editId }; if(editing==null) draft=null }
@@ -50,23 +60,33 @@ class MainActivity:ComponentActivity() {
    @Suppress("DEPRECATION")
    v.setPadding(Ui.dp(this,20)+insets.systemWindowInsetLeft,insets.systemWindowInsetTop,Ui.dp(this,20)+insets.systemWindowInsetRight,insets.systemWindowInsetBottom); insets
   }
-  root.addView(Ui.text(this,"Glucose Log",30f,true))
+  val heading=LinearLayout(this).apply { gravity=android.view.Gravity.CENTER_VERTICAL; setPadding(0,Ui.dp(this@MainActivity,8),0,Ui.dp(this@MainActivity,8)) }
+  heading.addView(Ui.text(this,"Glucose Log",28f,true),LinearLayout.LayoutParams(0,-2,1f))
+  heading.addView(Ui.button(this,"Settings") { settings() },LinearLayout.LayoutParams(-2,Ui.dp(this,48)))
+  root.addView(heading)
   val navigation=LinearLayout(this)
-  fun nav(label:String,which:String) { navigation.addView(Ui.button(this,label) { if(!saving) { if(tab=="log") draft=form?.snapshot(); tab=which; render() } },LinearLayout.LayoutParams(0,Ui.dp(this,52),1f).apply { marginEnd=Ui.dp(this@MainActivity,6) }) }
-  nav("Log","log"); nav("History","history")
-  navigation.addView(Ui.button(this,"Settings") { settings() },LinearLayout.LayoutParams(0,Ui.dp(this,52),1f)); root.addView(navigation)
-  status=Ui.text(this,"Readings save on this phone first.",14f).apply { setTextColor(Ui.muted) }; root.addView(status)
-  syncButton=Ui.button(this,"Sync to Health Connect") { connectOrSync() }; root.addView(syncButton)
+  fun nav(label:String,which:String) {
+   val button=Ui.button(this,label) { if(!saving) { if(tab=="log") draft=form?.snapshot(); tab=which; render() } }
+   navButtons[which]=button
+   navigation.addView(button,LinearLayout.LayoutParams(0,Ui.dp(this,54),1f).apply { marginEnd=Ui.dp(this@MainActivity,4); marginStart=Ui.dp(this@MainActivity,4); topMargin=Ui.dp(this@MainActivity,8); bottomMargin=Ui.dp(this@MainActivity,8) })
+  }
+  nav("New reading","log"); nav("History","history")
+  status=Ui.text(this,"Checking Health Connect…",14f).apply { setTextColor(Ui.muted) }; root.addView(status)
+  syncButton=Ui.button(this,"Connect Health Connect") { connectOrSync() }.apply { visibility=View.GONE }; root.addView(syncButton)
   body=Ui.column(this)
   root.addView(ScrollView(this).apply { isFillViewport=true; addView(body) },LinearLayout.LayoutParams(-1,0,1f))
+  root.addView(navigation)
   setContentView(root); root.requestApplyInsets(); render()
   if(!SyncJob.schedule(this)) status.text="Automatic retry is unavailable. Use Sync to Health Connect."
  }
  override fun onResume() { super.onResume(); if(::status.isInitialized) sync() }
  override fun onSaveInstanceState(out:Bundle) {
+  val pending=notices.pending(); out.putInt("noticeCount",pending.size)
+  pending.forEachIndexed { i,e -> out.putBundle("notice$i",Bundle().apply { putString("id",e.id); putDouble("value",e.value); putString("unit",e.unit.name); putLong("revision",e.revision) }) }
   out.putString("tab",tab); out.putBundle("draft",if(tab=="log") form?.snapshot() else draft); out.putString("editing",editing?.id); super.onSaveInstanceState(out)
  }
  private fun render() {
+  navButtons.forEach { (which,button) -> button.background=Ui.background(if(which==tab) Ui.teal else Ui.pale,Ui.dp(this,14).toFloat()); button.setTextColor(if(which==tab) Color.WHITE else Ui.ink) }
   body.removeAllViews()
   if(tab=="log") {
    form=EntryForm(this,editing,draft,preferredUnit) { save(it) }; body.addView(form)
@@ -75,17 +95,19 @@ class MainActivity:ComponentActivity() {
  }
  private fun save(e:Entry) {
   if(saving) return
-  saving=true; form?.saveButton?.isEnabled=false
+  saving=true; form?.setSaving(true)
   lifecycleScope.launch {
    try {
-    withContext(Dispatchers.IO) { store.save(e) }
+    val saved=withContext(Dispatchers.IO) { store.save(e) }
+    notices.add(saved)
     preferredUnit=e.unit; editing=null; draft=null
     status.text="Saved on this phone. Sending to Health Connect…"
-    Toast.makeText(this@MainActivity,"Reading saved",Toast.LENGTH_SHORT).show()
+    (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(form?.windowToken,0)
+    currentFocus?.clearFocus()
     render(); sync()
    } catch(ex:CancellationException) { throw ex }
    catch(ex:Exception) { AlertDialog.Builder(this@MainActivity).setTitle("Reading wasn't saved").setMessage(ex.message ?: "Please try again.").setPositiveButton("OK",null).show() }
-   finally { saving=false; form?.saveButton?.isEnabled=true }
+   finally { saving=false; form?.setSaving(false) }
   }
  }
  private fun history() {
@@ -117,20 +139,28 @@ class MainActivity:ComponentActivity() {
    }.show()
  }
  private fun sync() {
-  if(syncing) return
+  if(syncing) { syncAgain=true; return }
   syncing=true; syncButton.isEnabled=false
   lifecycleScope.launch {
    try {
-    val result=withTimeout(60_000) { HealthSync.run(applicationContext) }
-    status.text=when {
-     result.error!=null -> if(result.remaining>0) "${result.remaining} changes waiting. ${result.error}" else result.error
-     result.remaining>0 -> "${result.remaining} changes waiting. Tap Sync to retry."
-     else -> "Health Connect is up to date. Cronometer imports on its own schedule."
-    }
-    if(tab=="history") render()
-   } catch(ex:TimeoutCancellationException) { status.text="Sync timed out. Your readings are saved here; retry when ready." }
+    do {
+     syncAgain=false
+     val result=withTimeout(60_000) { HealthSync.run(applicationContext) }
+     val confirmations=notices.confirmed(withContext(Dispatchers.IO) { store.all() })
+     if(confirmations.isNotEmpty()) Toast.makeText(this@MainActivity,if(confirmations.size==1) confirmations.single() else "${confirmations.size} readings sent to Health Connect",Toast.LENGTH_LONG).show()
+     status.text=when {
+      result.error!=null -> if(result.remaining>0) "${result.remaining} waiting to sync. ${result.error}" else result.error
+      result.remaining>0 -> "${result.remaining} changes waiting to sync"
+      else -> "✓  Synced with Health Connect"
+     }
+     status.setTextColor(if(result.error==null && result.remaining==0) Ui.teal else Ui.muted)
+     syncButton.visibility=if(result.error!=null || result.remaining>0) View.VISIBLE else View.GONE
+     syncButton.text=if(result.error?.contains("Connect Health Connect")==true) "Connect Health Connect" else "Retry sync"
+     if(tab=="history") render()
+    } while(syncAgain)
+   } catch(ex:TimeoutCancellationException) { status.text="Saved on this phone. Sync will retry."; syncButton.visibility=View.VISIBLE }
    catch(ex:CancellationException) { throw ex }
-   catch(ex:Exception) { status.text="Sync could not finish. Please retry." }
+   catch(ex:Exception) { status.text="Saved on this phone. Sync will retry."; syncButton.visibility=View.VISIBLE }
    finally { syncing=false; syncButton.isEnabled=true }
   }
  }
@@ -141,11 +171,12 @@ class MainActivity:ComponentActivity() {
   }
  }
  private fun settings() {
-  AlertDialog.Builder(this).setTitle("Settings").setItems(arrayOf("Display units: ${preferredUnit.label}","Health Connect permissions","Privacy")) { _,which ->
+  AlertDialog.Builder(this).setTitle("Settings").setItems(arrayOf("Display units: ${preferredUnit.label}","Health Connect permissions","Retry pending sync","Privacy")) { _,which ->
    when(which) {
     0 -> AlertDialog.Builder(this).setTitle("Display units").setSingleChoiceItems(arrayOf("mg/dL","mmol/L"),preferredUnit.ordinal) { dialog,i -> preferredUnit=GlucoseUnit.entries[i]; dialog.dismiss(); if(tab=="history") render(); Toast.makeText(this,"Display unit saved. Existing draft keeps its selected unit.",Toast.LENGTH_LONG).show() }.setNegativeButton("Cancel",null).show()
     1 -> try { startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)) } catch(_:Exception) { Toast.makeText(this,"Health Connect isn't available.",Toast.LENGTH_LONG).show() }
-    2 -> startActivity(Intent(this,RationaleActivity::class.java))
+    2 -> sync()
+    3 -> startActivity(Intent(this,RationaleActivity::class.java))
    }
   }.show()
  }

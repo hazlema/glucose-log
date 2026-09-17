@@ -1,12 +1,12 @@
-# Verification — September 16, 2026
+# Verification — Glucose Log 0.2.0
 
-- Debug APK built with JDK17, SDK36, Gradle8.13.
-- 10 JVM tests passed, zero failures. Validation, unit conversion, timestamps, manual metadata, retry identity, stale acknowledgements, deletion routing and stale-edit guards covered.
-- Android lint: zero errors, six warnings (target SDK35, two programmatic custom-view constructors, three optional KTX suggestions).
-- APK signature verified with apksigner (v2).
-- Independent code review found stale edit/deletion and draft-restoration issues; corrected with expected revision guards, deletion draft cleanup and persisted draft revision.
-- Pixel installation succeeded for an intermediate build. Isolated SQLite device test demonstrated the original stale-edit bug after confirming save/reopen, edit revision, stale-ACK and tombstone behavior. Wireless ADB then stalled after installation reported success; the corrected full device test has not completed. Do not label final APK physically verified.
-- User reports the app works; Cronometer still plots both unit magnitudes at the same timestamp. No stored values changed to compensate. User is checking import settings.
-- No synthetic test readings written to Health Connect. Device test uses a separate temporary database. The new package does not modify the old Garmin bridge.
+- Built and installed in place on the paired Pixel. Existing app database and Health Connect permission preserved; no uninstall of the actual app.
+- 13 JVM tests pass: parsing, units, record metadata, time validation, retry identity, stale revisions, deletion routing, exact-revision success notices, no duplicate/false notices, confirmation restoration state.
+- Android lint: zero errors. Remaining warnings concern target SDK35, programmatic view constructors and optional KTX conveniences.
+- Isolated on-device tests pass: durable save/reopen, versioned edits, stale acknowledgements, deletion, rejection of stale edits, native entry startup, no per-keystroke saves, Done, physical Enter, repeated-submission guard, invalid input.
+- The physical Enter test first failed, then passed after explicit key handling and immediate submission locking. Both key-down and key-up are consumed; key repeats do not submit.
+- The rendered entry screen was captured from the Pixel and visually inspected for fit and legibility. Optional details are collapsed and healthy sync shows only a status line.
+- Test helper removed after checks. No synthetic records written to Health Connect; isolated database removed by the test. Existing real readings may sync normally when the app opens.
+- Code review addressed pending confirmation loss on rotation by persisting the expected reading ID/value/unit/revision in saved state. Toasts appear only after the exact revision is acknowledged.
 
-Still to check with final APK: native screen layout and interaction, permission grant, one intentional reading export, edit/delete propagation and background retry. Health Connect uses canonical mmol/L; Cronometer graph/import behavior is external to this app.
+User flow: enter a reading, optionally set time/meal/notes before completion, then Done or Enter. Saves locally and automatically syncs. Failed sync leaves the reading queued and a visible recovery action. Final receipt names the reading after Health Connect acceptance. No modification to Cronometer data or glucose-unit conversions.

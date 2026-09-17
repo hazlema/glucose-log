@@ -8,8 +8,13 @@ import android.view.ViewGroup
 import android.widget.TextView
 import java.util.UUID
 
-/** Uses a separate temporary database. Never calls Health Connect or saves through the UI. */
+/** Uses a separate temporary database. Never writes synthetic readings to Health Connect. */
 class DeviceChecks:Instrumentation() {
+ private fun onUi(action:()->Unit) {
+  var failure:Throwable?=null
+  runOnMainSync { try { action() } catch(t:Throwable) { failure=t } }
+  failure?.let { throw it }
+ }
  override fun onCreate(arguments:Bundle?) { super.onCreate(arguments); start() }
  override fun onStart() {
   val name="checks-${UUID.randomUUID()}.db"
@@ -31,13 +36,43 @@ class DeviceChecks:Instrumentation() {
    check(rejected) { "An old edit resurrected a deleted reading" }
    activity=startActivitySync(Intent(targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
    waitForIdleSync()
-   runOnMainSync {
+   onUi {
     fun texts(v:View):List<String> = (if(v is TextView) listOf(v.text.toString()) else emptyList()) + (if(v is ViewGroup) (0 until v.childCount).flatMap { texts(v.getChildAt(it)) } else emptyList())
     val labels=texts(activity!!.window.decorView)
-    check(labels.contains("100") && labels.contains("Save reading") && labels.contains("mg/dL")) { "Default entry form did not render" }
+    check(labels.contains("Glucose Log") && labels.contains("Press Done or Enter to save and sync")) { "Default entry form did not render" }
    }
-   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen") })
+   onUi {
+    val decor=activity!!.window.decorView
+    val bitmap=android.graphics.Bitmap.createBitmap(decor.width,decor.height,android.graphics.Bitmap.Config.ARGB_8888)
+    decor.draw(android.graphics.Canvas(bitmap))
+    java.io.File(targetContext.cacheDir,"entry-preview.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+    bitmap.recycle()
+    val saved=mutableListOf<Entry>()
+    val form=EntryForm(activity!!,null,null,GlucoseUnit.MG) { saved.add(it) }
+    fun number(v:View):android.widget.EditText? {
+     if(v is android.widget.EditText) return v
+     if(v is ViewGroup) for(i in 0 until v.childCount) { val found=number(v.getChildAt(i)); if(found!=null) return found }
+     return null
+    }
+    val field=number(form)!!
+    field.setText("1"); field.setText("11"); field.setText("110")
+    check(saved.isEmpty()) { "Typing partial digits saved a reading" }
+    field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+    check(saved.size==1 && saved.single().value==110.0) { "Done did not submit exactly one complete reading" }
+    form.setSaving(true)
+    field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+    check(saved.size==1) { "Repeated Done submitted during save" }
+    form.setSaving(false)
+    activity!!.setContentView(form); field.requestFocus(); field.setText("120")
+    field.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,android.view.KeyEvent.KEYCODE_ENTER))
+    field.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,android.view.KeyEvent.KEYCODE_ENTER))
+    check(saved.size==2 && saved.last().value==120.0) { "Hardware Enter did not submit exactly once" }
+    form.setSaving(false); field.setText("0")
+    field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+    check(saved.size==2) { "Invalid value was submitted" }
+   }
+   finish(Activity.RESULT_OK,Bundle().apply { putString("result","PASS: durable save, versioned edit, stale ack, delete, stale edit rejection, native entry screen, partial typing, Done, hardware Enter, duplicate guard, invalid input") })
   } catch(t:Throwable) { finish(Activity.RESULT_CANCELED,Bundle().apply { putString("failure",t.stackTraceToString()) }) }
-  finally { activity?.let { a -> runOnMainSync { a.finish() } }; store.close(); targetContext.deleteDatabase(name) }
+  finally { activity?.let { a -> onUi { a.finish() } }; store.close(); targetContext.deleteDatabase(name) }
  }
 }

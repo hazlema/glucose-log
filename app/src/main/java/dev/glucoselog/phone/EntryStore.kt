@@ -12,7 +12,7 @@ class EntryStore(context:Context,databaseName:String="glucose.db"):SQLiteOpenHel
  private fun rows(where:String)=readableDatabase.rawQuery("SELECT * FROM entries WHERE $where ORDER BY time DESC",null).use { c -> buildList { while(c.moveToNext()) add(read(c)) } }
  fun all()=rows("deleted=0")
  override fun pending()=rows("synced=0")
- fun save(e:Entry) {
+ fun save(e:Entry):Entry {
   e.validate(System.currentTimeMillis()/1000)
   val db=writableDatabase; db.beginTransaction()
   try {
@@ -23,6 +23,7 @@ class EntryStore(context:Context,databaseName:String="glucose.db"):SQLiteOpenHel
    }
    db.insertWithOnConflict("entries",null,v,SQLiteDatabase.CONFLICT_REPLACE).also { check(it!=-1L) { "Could not save reading." } }
    db.setTransactionSuccessful()
+   return e.copy(revision=previous+1,synced=false,deleted=false)
   } finally { db.endTransaction() }
  }
  fun delete(id:String) { writableDatabase.execSQL("UPDATE entries SET deleted=1,synced=0,revision=revision+1 WHERE id=? AND deleted=0",arrayOf(id)) }

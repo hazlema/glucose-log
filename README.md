@@ -4,9 +4,9 @@ A small, personal Android glucose journal. Enter on your phone, save locally, an
 
 ## Use
 
-Open **Glucose Log** (distinct from **Glucose Log Bridge**). The entry starts at 100 mg/dL. Tap the unit button to convert the draft to mmol/L. Choose a measurement date/time or leave it at Now, optionally add a meal label and notes, then Save reading.
+Open **Glucose Log** (distinct from **Glucose Log Bridge**). The entry starts at 100 mg/dL. Tap the unit button to convert the draft to mmol/L. Choose a measurement date/time or leave it at Now, optionally add a meal label and notes, then press the keyboard’s **Done** button or hardware **Enter**. This saves and syncs immediately. There is no separate Save button. Optional time, meal, and notes are under **+ Time, meal & notes**; set these before pressing Done.
 
-Tap **Sync to Health Connect** and allow blood glucose write access. New readings and edits sync after saving and on opening the app; pending changes also retry periodically when Android permits. Local logging works without permission. History marks each reading sent or waiting. A successful export does not guarantee immediate Cronometer import. In Cronometer, enable its Health Connect blood-glucose import and backfill if needed.
+On first use, tap **Connect Health Connect** and allow blood glucose write access. The connection button disappears once connected; a small status line remains. A toast names the reading only after Health Connect accepts its saved revision. New readings and edits sync after saving and on opening the app; pending changes also retry periodically when Android permits. Local logging works without permission. If sync is unavailable, the status says changes are waiting; Settings offers Retry pending sync. History marks each reading sent or waiting. A successful export does not guarantee immediate Cronometer import. In Cronometer, enable its Health Connect blood-glucose import and backfill if needed.
 
 History contains a seven-day scatter graph and all local entries. Settings controls the history display unit and default unit for new forms; the current draft retains its own unit. Edit preserves the reading identity. Delete asks for confirmation and queues removal of this app's Health Connect record. Cronometer may retain an already imported copy.
 

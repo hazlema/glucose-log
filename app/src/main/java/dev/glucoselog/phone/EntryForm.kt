@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
 import android.widget.*
 import java.time.*
 import java.time.format.DateTimeFormatter
@@ -23,29 +25,52 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
  private val meal=Spinner(c)
  private val timeButton:Button
  private val unitButton:Button
- val saveButton:Button
+ private var submitting=false
+ fun setSaving(value:Boolean) { submitting=value; number.isEnabled=!value; notes.isEnabled=!value; meal.isEnabled=!value; unitButton.isEnabled=!value; timeButton.isEnabled=!value }
  private var exactValue=saved?.getDouble("exact") ?: original?.value ?: unit.initial.toDouble()
  private var rendered=saved?.getString("rendered") ?: unit.format(exactValue)
  init {
   orientation=VERTICAL
-  addView(Ui.text(c,if(original==null) "Log a reading" else "Edit reading",26f,true))
+  setPadding(0,Ui.dp(c,20),0,Ui.dp(c,24))
+  addView(Ui.text(c,if(original==null) "New reading" else "Edit reading",28f,true))
+  addView(Ui.text(c,"Enter your blood glucose",16f).apply { setTextColor(Ui.muted) })
   val numberRow=LinearLayout(c).apply { gravity=Gravity.CENTER_VERTICAL }
-  number.apply { setText(saved?.getString("number") ?: rendered); textSize=48f; setTextColor(Ui.ink); inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setSingleLine(); setSelectAllOnFocus(true); contentDescription="Blood glucose value"; filters=arrayOf(InputFilter.LengthFilter(12)); setPadding(0,Ui.dp(c,8),Ui.dp(c,8),Ui.dp(c,8)) }
+  number.apply { setText(saved?.getString("number") ?: rendered); textSize=64f; setTextColor(Ui.ink); inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setSingleLine(); setSelectAllOnFocus(true); contentDescription="Blood glucose value"; filters=arrayOf(InputFilter.LengthFilter(12)); setPadding(0,Ui.dp(c,8),Ui.dp(c,8),Ui.dp(c,8)) }
+  number.imeOptions=EditorInfo.IME_ACTION_DONE
+  number.setOnEditorActionListener { _,action,event ->
+   if(action==EditorInfo.IME_ACTION_DONE || (event?.keyCode==KeyEvent.KEYCODE_ENTER && event.action==KeyEvent.ACTION_DOWN)) { submit(); true } else false
+  }
+  number.setOnKeyListener { _,key,event ->
+   if(key==KeyEvent.KEYCODE_ENTER || key==KeyEvent.KEYCODE_NUMPAD_ENTER) {
+    if(event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0) submit()
+    true
+   } else false
+  }
+  numberRow.setPadding(Ui.dp(c,16),Ui.dp(c,16),Ui.dp(c,16),Ui.dp(c,16))
+  numberRow.background=Ui.background(Ui.pale,Ui.dp(c,20).toFloat())
+  numberRow.layoutParams=LayoutParams(-1,-2).apply { topMargin=Ui.dp(c,20); bottomMargin=Ui.dp(c,8) }
   numberRow.addView(number,LinearLayout.LayoutParams(0,-2,1f))
   unitButton=Ui.button(c,unit.label) { switchUnit() }
   numberRow.addView(unitButton,LinearLayout.LayoutParams(-2,Ui.dp(c,56)))
   addView(numberRow)
-  addView(Ui.text(c,"Measured at",14f,true))
-  timeButton=Ui.button(c,"") { chooseTime() }; addView(timeButton); updateTime()
-  if(original==null) addView(Ui.button(c,"Use current time") { customTime=false; updateTime() })
-  addView(Ui.text(c,"Meal label (optional)",14f,true))
+  addView(Ui.text(c,"Press Done or Enter to save and sync",14f).apply { setTextColor(Ui.muted) })
+  val details=Ui.column(c).apply { visibility=if(saved?.getBoolean("details")==true || original!=null) VISIBLE else GONE }
+  val detailsToggle=Ui.button(c,if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes") {}
+  detailsToggle.setOnClickListener { details.visibility=if(details.visibility==VISIBLE) GONE else VISIBLE; detailsToggle.text=if(details.visibility==VISIBLE) "Hide details" else "+  Time, meal & notes" }
+  addView(detailsToggle); addView(details)
+  details.tag="details"
+  details.addView(Ui.text(c,"Measured at",14f,true))
+  timeButton=Ui.button(c,"") { chooseTime() }; details.addView(timeButton); updateTime()
+  if(original==null) details.addView(Ui.button(c,"Use current time") { customTime=false; updateTime() })
+  details.addView(Ui.text(c,"Meal label (optional)",14f,true))
   meal.adapter=ArrayAdapter(c,android.R.layout.simple_spinner_dropdown_item,Entry.contexts)
-  meal.setSelection(saved?.getInt("meal") ?: original?.context ?: 0); meal.minimumHeight=Ui.dp(c,52); meal.contentDescription="Meal label"; addView(meal)
-  addView(Ui.text(c,"Notes (optional)",14f,true))
+  meal.setSelection(saved?.getInt("meal") ?: original?.context ?: 0); meal.minimumHeight=Ui.dp(c,52); meal.contentDescription="Meal label"; details.addView(meal)
+  details.addView(Ui.text(c,"Notes (optional)",14f,true))
   notes.apply { hint="Food, exercise, or anything to remember"; textSize=16f; inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES; minLines=2; maxLines=5; filters=arrayOf(InputFilter.LengthFilter(2000)); setText(saved?.getString("note") ?: original?.note ?: ""); setTextColor(Ui.ink); setHintTextColor(Ui.muted); contentDescription="Notes" }
-  addView(notes)
-  saveButton=Ui.button(c,if(original==null) "Save reading" else "Save changes",true) { submit() }; addView(saveButton)
-  addView(Ui.text(c,"Saved on this phone. Notes stay here; glucose and meal labels sync to Health Connect.",13f).apply { setTextColor(Ui.muted) })
+  details.addView(notes)
+  notes.imeOptions=EditorInfo.IME_ACTION_DONE
+  notes.setOnEditorActionListener { _,action,_ -> if(action==EditorInfo.IME_ACTION_DONE) { submit(); true } else false }
+  details.addView(Ui.text(c,"Notes stay on your phone. Press Done on the reading field when ready.",13f).apply { setTextColor(Ui.muted) })
  }
  private fun value():Double {
   val parsed=unit.parse(number.text.toString())
@@ -68,14 +93,15 @@ class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:
   },z.year,z.monthValue-1,z.dayOfMonth).apply { datePicker.maxDate=System.currentTimeMillis() }.show()
  }
  private fun submit() {
+  if(submitting) return
   try {
    val time=if(customTime) instant else Instant.now().epochSecond
    val zone=if(customTime) offset else ZoneId.systemDefault().rules.getOffset(Instant.ofEpochSecond(time)).totalSeconds
    val e=Entry(id,value(),unit,time,zone,meal.selectedItemPosition,notes.text.toString().trim(),expectedRevision,false,false)
-   e.validate(Instant.now().epochSecond); onSave(e)
-  } catch(ex:IllegalArgumentException) { Toast.makeText(context,ex.message,Toast.LENGTH_LONG).show() }
+   e.validate(Instant.now().epochSecond); setSaving(true); onSave(e)
+  } catch(ex:IllegalArgumentException) { setSaving(false); Toast.makeText(context,ex.message,Toast.LENGTH_LONG).show() }
  }
  fun snapshot()=Bundle().apply {
-  putString("id",id); putLong("revision",expectedRevision); putString("unit",unit.name); putString("number",number.text.toString()); putString("note",notes.text.toString()); putInt("meal",meal.selectedItemPosition); putBoolean("customTime",customTime); putLong("time",instant); putInt("offset",offset); putDouble("exact",exactValue); putString("rendered",rendered)
+  putBoolean("details",findViewWithTag<android.view.View>("details")?.visibility==VISIBLE); putString("id",id); putLong("revision",expectedRevision); putString("unit",unit.name); putString("number",number.text.toString()); putString("note",notes.text.toString()); putInt("meal",meal.selectedItemPosition); putBoolean("customTime",customTime); putLong("time",instant); putInt("offset",offset); putDouble("exact",exactValue); putString("rendered",rendered)
  }
 }
