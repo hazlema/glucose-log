@@ -1,0 +1,14 @@
+# Glucose Log for Android
+Approved in chat: phone entry, default 100 mg/dL, backdating, optional meal labels and notes, save, history/edit/delete/graph, local data, Health Connect export. Separate project requested at /home/frosty/Dev/android/glucose-log.
+
+Native Kotlin app, independent package dev.glucoselog.phone. The existing bridge remains installed and untouched. No Garmin dependency, login, ads, analytics, Internet permission or server. Android 9 minimum; Pixel 7 is the physical target. SDK 36, target 35, Java 17.
+
+Two screens: Log and History. Entry defaults to 100 mg/dL or 5.6 mmol/L. Unit switch converts the draft. Save records current time unless explicitly backdated. Optional meal context and local-only notes. Edits retain original unit/time unless changed. History shows all local readings newest first with per-record Health Connect status and a seven-day scatter graph (no inferred continuous measurements or clinical ranges). Deletion requires confirmation and queues deletion of this app's corresponding Health Connect record.
+
+SQLite is the durable source of truth. UUID identity, increasing revision and deleted tombstone form an outbox. Insert Health Connect with manual-entry metadata, clientRecordId UUID, clientRecordVersion revision, explicit value/unit, captured offset and meal relation. Acknowledge only the exact sent revision. New drafts have revision zero; saving an edit requires its revision to match the persisted row, so deleted or stale drafts cannot recreate readings. Retrying is idempotent. Revoked permission and provider failures leave pending rows. Local notes never leave the app. Sync at save/start and opportunistically with a persisted Android JobScheduler job (15-minute interval, subject to OS scheduling), without an ongoing foreground service. Global Mutex serializes jobs and UI sync. No promises of Cronometer import timing or fixing its graph.
+
+Privacy page explains local storage, Health Connect writes and deletion, notes, no backup and uninstall implications. No A1c prediction or treatment advice. Separate icon and label Glucose Log. Local database backup disabled; uninstall loses local history. Old bridge records are not imported or deleted automatically.
+
+Tests: numeric validation and unit round-trip, boundaries, time, outbox failure/retry/stale acknowledgement, versioned writes/deletions, Health Connect metadata/conversion. Build APK and lint. Phone install and real UI/Health Connect validation depend on available device connection; explicitly distinguish local checks from physical checks.
+
+Visual design: white #FFFFFF, pale blue #F0F5FA, ink #15324A, teal #087E8B, muted #52697A, error #A32935. Native sans font; 48sp editable reading, 28sp title, 16sp controls. Large entry field is the main interaction. Left-aligned labels, 48dp minimum tap targets, scrolling at large text sizes, system insets. No decorative gradients.

@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" />
+ <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+ <queries><package android:name="com.google.android.apps.healthdata" /></queries>
+ <application android:label="Glucose Log" android:icon="@drawable/ic_glucose" android:theme="@style/AppTheme" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true">
+  <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+  <activity android:name=".RationaleActivity" android:exported="true"><intent-filter><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/></intent-filter></activity>
+  <activity-alias android:name=".ViewPermissionUsageActivity" android:exported="true" android:targetActivity=".RationaleActivity" android:permission="android.permission.START_VIEW_PERMISSION_USAGE"><intent-filter><action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/><category android:name="android.intent.category.HEALTH_PERMISSIONS"/></intent-filter></activity-alias>
+  <service android:name=".SyncJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+ </application>
+</manifest>

@@ -1,0 +1,81 @@
+package dev.glucoselog.phone
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import android.content.Context
+import android.os.Bundle
+import android.text.InputFilter
+import android.text.InputType
+import android.view.Gravity
+import android.widget.*
+import java.time.*
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+
+class EntryForm(c:Context,private val original:Entry?,saved:Bundle?,initialUnit:GlucoseUnit,private val onSave:(Entry)->Unit):LinearLayout(c) {
+ private var unit=GlucoseUnit.valueOf(saved?.getString("unit") ?: original?.unit?.name ?: initialUnit.name)
+ private val id=saved?.getString("id") ?: original?.id ?: UUID.randomUUID().toString()
+ private val expectedRevision=saved?.getLong("revision") ?: original?.revision ?: 0L
+ private var customTime=saved?.getBoolean("customTime") ?: (original!=null)
+ private var instant=saved?.getLong("time") ?: original?.time ?: Instant.now().epochSecond
+ private var offset=saved?.getInt("offset") ?: original?.offset ?: ZoneId.systemDefault().rules.getOffset(Instant.ofEpochSecond(instant)).totalSeconds
+ private val number=EditText(c)
+ private val notes=EditText(c)
+ private val meal=Spinner(c)
+ private val timeButton:Button
+ private val unitButton:Button
+ val saveButton:Button
+ private var exactValue=saved?.getDouble("exact") ?: original?.value ?: unit.initial.toDouble()
+ private var rendered=saved?.getString("rendered") ?: unit.format(exactValue)
+ init {
+  orientation=VERTICAL
+  addView(Ui.text(c,if(original==null) "Log a reading" else "Edit reading",26f,true))
+  val numberRow=LinearLayout(c).apply { gravity=Gravity.CENTER_VERTICAL }
+  number.apply { setText(saved?.getString("number") ?: rendered); textSize=48f; setTextColor(Ui.ink); inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setSingleLine(); setSelectAllOnFocus(true); contentDescription="Blood glucose value"; filters=arrayOf(InputFilter.LengthFilter(12)); setPadding(0,Ui.dp(c,8),Ui.dp(c,8),Ui.dp(c,8)) }
+  numberRow.addView(number,LinearLayout.LayoutParams(0,-2,1f))
+  unitButton=Ui.button(c,unit.label) { switchUnit() }
+  numberRow.addView(unitButton,LinearLayout.LayoutParams(-2,Ui.dp(c,56)))
+  addView(numberRow)
+  addView(Ui.text(c,"Measured at",14f,true))
+  timeButton=Ui.button(c,"") { chooseTime() }; addView(timeButton); updateTime()
+  if(original==null) addView(Ui.button(c,"Use current time") { customTime=false; updateTime() })
+  addView(Ui.text(c,"Meal label (optional)",14f,true))
+  meal.adapter=ArrayAdapter(c,android.R.layout.simple_spinner_dropdown_item,Entry.contexts)
+  meal.setSelection(saved?.getInt("meal") ?: original?.context ?: 0); meal.minimumHeight=Ui.dp(c,52); meal.contentDescription="Meal label"; addView(meal)
+  addView(Ui.text(c,"Notes (optional)",14f,true))
+  notes.apply { hint="Food, exercise, or anything to remember"; textSize=16f; inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES; minLines=2; maxLines=5; filters=arrayOf(InputFilter.LengthFilter(2000)); setText(saved?.getString("note") ?: original?.note ?: ""); setTextColor(Ui.ink); setHintTextColor(Ui.muted); contentDescription="Notes" }
+  addView(notes)
+  saveButton=Ui.button(c,if(original==null) "Save reading" else "Save changes",true) { submit() }; addView(saveButton)
+  addView(Ui.text(c,"Saved on this phone. Notes stay here; glucose and meal labels sync to Health Connect.",13f).apply { setTextColor(Ui.muted) })
+ }
+ private fun value():Double {
+  val parsed=unit.parse(number.text.toString())
+  return if(number.text.toString()==rendered) exactValue else parsed
+ }
+ private fun switchUnit() {
+  try {
+   val mg=unit.toMg(value()); unit=if(unit==GlucoseUnit.MG) GlucoseUnit.MMOL else GlucoseUnit.MG
+   exactValue=unit.fromMg(mg); rendered=unit.format(exactValue); number.setText(rendered); unitButton.text=unit.label
+  } catch(ex:IllegalArgumentException) { number.error=ex.message }
+ }
+ private fun updateTime() { timeButton.text=if(!customTime) "Now · time recorded when saved" else Instant.ofEpochSecond(instant).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy  h:mm a")) }
+ private fun chooseTime() {
+  val z=Instant.ofEpochSecond(if(customTime) instant else Instant.now().epochSecond).atZone(ZoneId.systemDefault())
+  DatePickerDialog(context,{_,year,month,day ->
+   TimePickerDialog(context,{_,hour,minute ->
+    val chosen=LocalDateTime.of(year,month+1,day,hour,minute).atZone(ZoneId.systemDefault())
+    instant=chosen.toEpochSecond(); offset=chosen.offset.totalSeconds; customTime=true; updateTime()
+   },z.hour,z.minute,android.text.format.DateFormat.is24HourFormat(context)).show()
+  },z.year,z.monthValue-1,z.dayOfMonth).apply { datePicker.maxDate=System.currentTimeMillis() }.show()
+ }
+ private fun submit() {
+  try {
+   val time=if(customTime) instant else Instant.now().epochSecond
+   val zone=if(customTime) offset else ZoneId.systemDefault().rules.getOffset(Instant.ofEpochSecond(time)).totalSeconds
+   val e=Entry(id,value(),unit,time,zone,meal.selectedItemPosition,notes.text.toString().trim(),expectedRevision,false,false)
+   e.validate(Instant.now().epochSecond); onSave(e)
+  } catch(ex:IllegalArgumentException) { Toast.makeText(context,ex.message,Toast.LENGTH_LONG).show() }
+ }
+ fun snapshot()=Bundle().apply {
+  putString("id",id); putLong("revision",expectedRevision); putString("unit",unit.name); putString("number",number.text.toString()); putString("note",notes.text.toString()); putInt("meal",meal.selectedItemPosition); putBoolean("customTime",customTime); putLong("time",instant); putInt("offset",offset); putDouble("exact",exactValue); putString("rendered",rendered)
+ }
+}
