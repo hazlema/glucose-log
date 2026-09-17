@@ -66,7 +66,15 @@ class MainActivity:ComponentActivity() {
   root.addView(heading)
   val navigation=LinearLayout(this)
   fun nav(label:String,which:String) {
-   val button=Ui.button(this,label) { if(!saving) { if(tab=="log") draft=form?.snapshot(); tab=which; render() } }
+   val button=Ui.button(this,label) {
+    if(!saving) {
+     form?.keyboardVisibilityChanged(false,false)
+     editing=null; draft=null; tab=which
+     currentFocus?.clearFocus()
+     render()
+     (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(body.windowToken,0)
+    }
+   }
    navButtons[which]=button
    navigation.addView(button,LinearLayout.LayoutParams(0,Ui.dp(this,54),1f).apply { marginEnd=Ui.dp(this@MainActivity,4); marginStart=Ui.dp(this@MainActivity,4); topMargin=Ui.dp(this@MainActivity,8); bottomMargin=Ui.dp(this@MainActivity,8) })
   }

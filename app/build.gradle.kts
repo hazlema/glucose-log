@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
  namespace = "dev.glucoselog.phone"
  compileSdk = 36
- defaultConfig { applicationId = "dev.glucoselog.phone"; minSdk = 28; targetSdk = 35; versionCode = 4; versionName = "0.3.1"; testInstrumentationRunner = "dev.glucoselog.phone.DeviceChecks" }
+ defaultConfig { applicationId = "dev.glucoselog.phone"; minSdk = 28; targetSdk = 35; versionCode = 5; versionName = "0.3.2"; testInstrumentationRunner = "dev.glucoselog.phone.DeviceChecks" }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
 }
