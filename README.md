@@ -10,6 +10,21 @@ A simple Android blood-glucose journal that syncs with Health Connect. Built for
 - History, a seven-day graph, and editing/deletion.
 - Automatic Health Connect sync, durable retries, and a toast confirming successful export.
 
+## Screenshots
+
+Captured on a Pixel 7 running Android 17.
+
+<p>
+  <img src="docs/screenshots/entry.png" alt="Glucose Log entry screen" width="280" />
+  <img src="docs/screenshots/history.png" alt="Glucose Log history and seven-day graph" width="280" />
+</p>
+
+## Download
+
+[Download the latest APK](https://github.com/hazlema/glucose-log/releases/latest/download/GlucoseLog.apk) or browse the [release notes](https://github.com/hazlema/glucose-log/releases).
+
+Tested on **Android 17**. The app supports Android 9+, subject to Health Connect availability. Install over an existing copy to retain its local data; the release uses the same development signing key as the tested phone build.
+
 ## Getting started
 
 1. Install the APK and open **Glucose Log**.
